@@ -1,12 +1,15 @@
 package com.amplogik.shuttlepro;
 
+import java.io.PrintWriter;
 import java.nio.ByteBuffer;
+import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.Map;
 
 import com.bitwig.extension.api.MemoryBlock;
 import com.bitwig.extension.controller.ControllerExtension;
 import com.bitwig.extension.controller.api.Action;
+import com.bitwig.extension.controller.api.ActionCategory;
 import com.bitwig.extension.controller.api.Application;
 import com.bitwig.extension.controller.api.ControllerHost;
 import com.bitwig.extension.controller.api.Preferences;
@@ -50,6 +53,15 @@ public class ShuttleProExtension extends ControllerExtension {
     private static final String ACT_PREV_CUE_MARKER  = "Previous Cue Marker";
     private static final String ACT_NEXT_CUE_MARKER  = "Next Cue Marker";
     private static final String ACT_CYCLE_WHEEL_MODE = "Cycle Wheel Mode";
+    private static final String ACT_TOOL_POINTER     = "Tool: Pointer (Edit)";
+    private static final String ACT_TOOL_TIME_SEL    = "Tool: Time Selection";
+    private static final String ACT_TOOL_PENCIL      = "Tool: Pencil";
+    private static final String ACT_TOOL_SPRAY       = "Tool: Spray Can";
+    private static final String ACT_TOOL_KNIFE       = "Tool: Knife";
+    private static final String ACT_TOOL_ERASER      = "Tool: Eraser";
+    private static final String ACT_TOOL_AUDITION    = "Tool: Audition";
+    private static final String ACT_TOOL_STEP_INPUT  = "Tool: Step Input";
+    private static final String ACT_DUMP_ACTIONS     = "Dump Bitwig Actions (debug)";
 
     private static final String[] ACTIONS = {
             ACT_NONE,
@@ -61,7 +73,10 @@ public class ShuttleProExtension extends ControllerExtension {
             ACT_SPLIT,
             ACT_SET_LOOP_IN, ACT_SET_LOOP_OUT,
             ACT_ADD_CUE_MARKER, ACT_PREV_CUE_MARKER, ACT_NEXT_CUE_MARKER,
-            ACT_CYCLE_WHEEL_MODE
+            ACT_CYCLE_WHEEL_MODE,
+            ACT_TOOL_POINTER, ACT_TOOL_TIME_SEL, ACT_TOOL_PENCIL, ACT_TOOL_SPRAY,
+            ACT_TOOL_KNIFE, ACT_TOOL_ERASER, ACT_TOOL_AUDITION, ACT_TOOL_STEP_INPUT,
+            ACT_DUMP_ACTIONS
     };
 
     // Wheel mode options. Order is the cycle order.
@@ -120,6 +135,10 @@ public class ShuttleProExtension extends ControllerExtension {
         transport   = host.createTransport();
         application = host.createApplication();
 
+        transport.playPosition().markInterested();
+        transport.arrangerLoopStart().markInterested();
+        transport.arrangerLoopDuration().markInterested();
+
         setupPreferences(host.getPreferences());
         setupActionMap();
 
@@ -159,6 +178,15 @@ public class ShuttleProExtension extends ControllerExtension {
         actionMap.put(ACT_PREV_CUE_MARKER,  transport::jumpToPreviousCueMarker);
         actionMap.put(ACT_NEXT_CUE_MARKER,  transport::jumpToNextCueMarker);
         actionMap.put(ACT_CYCLE_WHEEL_MODE, this::cycleWheelMode);
+        actionMap.put(ACT_TOOL_POINTER,     namedAction("select_object_selection_tool"));
+        actionMap.put(ACT_TOOL_TIME_SEL,    namedAction("select_time_selection_tool"));
+        actionMap.put(ACT_TOOL_PENCIL,      namedAction("select_create_tool"));
+        actionMap.put(ACT_TOOL_SPRAY,       namedAction("select_spray_tool"));
+        actionMap.put(ACT_TOOL_KNIFE,       namedAction("select_cut_tool"));
+        actionMap.put(ACT_TOOL_ERASER,      namedAction("select_erase_tool"));
+        actionMap.put(ACT_TOOL_AUDITION,    namedAction("select_audition_tool"));
+        actionMap.put(ACT_TOOL_STEP_INPUT,  namedAction("select_step_input_tool"));
+        actionMap.put(ACT_DUMP_ACTIONS,     this::dumpBitwigActions);
     }
 
     private void setupPreferences(Preferences prefs) {
@@ -205,6 +233,27 @@ public class ShuttleProExtension extends ControllerExtension {
             if (a != null) a.invoke();
             else getHost().errorln("ShuttlePro: unknown Bitwig action id '" + id + "'");
         };
+    }
+
+    private void dumpBitwigActions() {
+        ControllerHost host = getHost();
+        String path = Paths.get(System.getProperty("user.home"),
+                "shuttlepro-bitwig-actions.txt").toString();
+        int count = 0;
+        try (PrintWriter w = new PrintWriter(path)) {
+            for (ActionCategory cat : application.getActionCategories()) {
+                w.println("[" + cat.getId() + "] " + cat.getName());
+                for (Action a : cat.getActions()) {
+                    w.println("  " + a.getId() + "  |  " + a.getName());
+                    count++;
+                }
+            }
+        } catch (Exception e) {
+            host.errorln("ShuttlePro: failed to write action dump: " + e.getMessage());
+            return;
+        }
+        host.println("ShuttlePro: wrote " + count + " actions to " + path);
+        host.showPopupNotification("Action dump: " + count + " actions → ~/shuttlepro-bitwig-actions.txt");
     }
 
     private void setLoopInAtPlayhead() {
