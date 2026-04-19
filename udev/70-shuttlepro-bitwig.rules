@@ -1,0 +1,9 @@
+# Grant Bitwig (running as your user) raw USB access to the Contour ShuttlePro v2.
+# Without this, libusb inside the Bitwig extension cannot claim the device.
+# Install: sudo cp 70-shuttlepro-bitwig.rules /etc/udev/rules.d/
+#          sudo udevadm control --reload && sudo udevadm trigger
+#
+# TAG+="uaccess" gives access to the currently logged-in seat user via logind,
+# which is what you want on a normal desktop session. MODE/GROUP kept as a
+# fallback for headless/multi-user setups.
+SUBSYSTEM=="usb", ATTRS{idVendor}=="0b33", ATTRS{idProduct}=="0030", MODE="0660", GROUP="plugdev", TAG+="uaccess"
